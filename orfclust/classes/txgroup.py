@@ -9,14 +9,35 @@ from classes.transcript import Transcript, Object
 from utils.common import *
 
 class TXGroup:
+    """
+    Represents a general class of a group of objects.
+    In this general implementation any object can be added to the group.
+
+    Attributes:
+        objects (list): A list of objects.
+        tid_map (dict): A mapping of transcript IDs to positions in the objects list.
+    """
     def __init__(self):
         self.objects = list()
         self.tid_map = dict() # transcript_id to position in objects list
+
     def clear(self):
+        """
+        Clear the objects and tid_map.
+        """
         self.objects = list()
         self.tid_map = dict()
         
     def add_object(self,obj) -> int:
+        """
+        Add an object to the TXGroup. In this general implementation any object can be added to the group.
+
+        Args:
+            obj: The object to add.
+
+        Returns:
+            int: The index of the added object in the objects list.
+        """
         idx = None
         if obj.get_type() in [Types.Transcript, Types.Exon, Types.CDS]:
             idx = self.tid_map.setdefault(obj.get_tid(),len(self.objects))
@@ -35,32 +56,74 @@ class TXGroup:
         return idx
     
     def __getitem__(self,idx):
+        """
+        Get an object from the TXGroup by index.
+
+        Args:
+            idx: The index of the object.
+
+        Returns:
+            object: The object at the specified index.
+        """
         return self.objects[idx]
         
     def object_it(self):
+        """
+        Iterate over all objects in the TXGroup.
+        Specific implementations of the TXGroup may provide specialized implementations such as transcdrip_it which yield subsets of the objects.
+        This one should not be overwritten.
+        """
         for obj in self.objects:
             yield obj
 
     def is_empty(self) -> bool:
+        """
+        Check if the TXGroup is empty.
+
+        Returns:
+            bool: True if the TXGroup is empty, False otherwise.
+        """
         return len(self.objects) == 0
 
     def sort(self) -> None:
+        """
+        Sort the objects in the TXGroup.
+        """
+        assert False,"General object sort method is not currently implemented"
         # TODO: do we need other sorting methods?
         cmp = lambda obj: obj.get_cds()
         self._sort(cmp)
     
     def _sort(self,cmp) -> None:
+        """
+        Sort the objects in the TXGroup using a custom comparison function.
+
+        Args:
+            cmp: The comparison function to determine the sorting order.
+        """
         self.objects.sort(key=cmp)
         self.reindex()
 
 
     def to_gtf(self):
+        """
+        Convert the TXGroup to GTF format.
+
+        Returns:
+            str: The TXGroup objects formatted as a GTF string.
+        """
         res = ""
         for obj in self.objects:
             res+=obj.to_gtf()
         return res
     
     def to_gff(self):
+        """
+        Convert the TXGroup to GFF format.
+
+        Returns:
+            str: The TXGroup objects formatted as a GFF string.
+        """
         res = ""
         for obj in self.objects:
             res+=obj.to_gtf()
@@ -68,6 +131,9 @@ class TXGroup:
 
     # for every object in the object list reconstruct the tidmap
     def reindex(self):
+        """
+        Reconstruct the tid_map based on the objects in the TXGroup.
+        """
         self.tid_map.clear()
         idx = 0
         for obj in self.objects:
@@ -78,73 +144,16 @@ class TXGroup:
     __repr__ = to_gtf
 
     __str__ = __repr__
-    
 
-# largest specialization of the TXGroup which can yield all other types
-class Transcriptome (TXGroup):
-    def __init__(self):
-        super().__init__()
-
-    def build_from_file(self,fname: str) -> None:
-        # get object (can e anything)
-        # add to the transcriptome
-        # transcriptome looks up by transcript id
-        # what if object is a gene or a collection of objects?
-        # neex to brake down into individual components with transcript IDs and add them individually
-        treader = TReader(fname)
-        for obj in treader.next_obj():
-            self.add_object(obj)
-
-        for obj in self.objects:
-            if obj.get_type() == Types.Transcript:
-                obj.finalize()
-
-    # def load_expression(self,fname: str) -> None:
-    #     assert os.path.exists(fname),"expression data file not found: "+fname
-    #     with open(fname,"r") as inFP:
-    #         for line in inFP:
-
-        
-    def coordinate_sort(self):
-        self.objects.sort(key = lambda obj: obj.get_exons())
-        self.reindex()
-    def gid_sort(self):
-        self.objects.sort(key = lambda obj: obj.get_gid())
-        self.reindex()
-            
-    def transcript_it(self):
-        for obj in self.object_it(): # TODO: types are enumeration shared between all classes
-            if obj.obj_type==Types.Transcript:
-                yield obj
-                
-    def gene_it(self):
-        gene = Gene()
-        for obj in self.object_it():
-            if gene.is_empty() or gene.get_gid() == obj.get_gid():
-                gene.add_object(obj)
-            else:
-                yield gene
-                gene = Gene()
-                gene.add_object(obj)
-    
-        if not gene.is_empty():
-            yield gene
-            
-    def bundle_it(self):
-        bundle = Bundle()
-        for obj in self.object_it():
-            if bundle.is_empty() or bundle.overlaps(obj):
-                bundle.add(obj)
-            else:
-                yield bundle
-                bundle = Bundle()
-                bundle.add(obj)
-    
-        if not bundle.is_empty():
-            yield bundle
-
-# specialization of a Object which guarantees that all objects overlap transitevily. Inherits also from the common object traits such as start,end,overlaps, etc
 class Bundle (TXGroup,Object):
+    """
+    Specialization designed to describe an Object which is also a Group of Objects 
+    such as OverlapBundle (transcripts with overlapping coordinates)
+    or Genes (transcripts with the same geneID). 
+    Inherits also from the common object traits such as start,end,overlaps, etc
+
+    Unlike TXGroup, since Bundle 9inherits from Object, it has start and end and is guaranteed to exist on the same seqid and strand
+    """
     def __init__(self):
         TXGroup.__init__(self)
         Object.__init__(self)
@@ -152,6 +161,19 @@ class Bundle (TXGroup,Object):
         self.intervals = IntervalTree() # union of all exons in the locus (minus the introns)
 
     def add_object(self,obj: Object) -> bool:
+        """
+        Add an object to the Bundle.
+        Only adds if satisfies basic Bundle constraints:
+        1. all objects share seqid
+        2. all objects share strand
+        Updates start/end
+
+        Args:
+            obj (Object): The object to add.
+
+        Returns:
+            bool: True if the object was successfully added, False otherwise.
+        """
         if self.seqid is None:
             self.seqid = obj.seqid
         if self.strand is None:
@@ -174,17 +196,43 @@ class Bundle (TXGroup,Object):
         return True
     
     def get_start(self) -> int:
+        """Get the start coordinate of the Bundle.
+
+        Returns:
+            int: The start coordinate.
+        """
         return self.start
+
     def get_end(self) -> int:
+        """Get the end coordinate of the Bundle.
+
+        Returns:
+            int: The end coordinate.
+        """
         return self.end
 
-# specialization of a Bundle which guarantees that all objects have the same gene ID. Inherits also from the common object traits such as start,end,overlaps, etc
 class Gene (Bundle):
+    """
+    Represents a specialization of Bundle where all objects have the same gene ID.
+    """
+
     def __init__(self):
         super().__init__()
         self.gid = None
 
     def add_object(self,obj: Object) -> bool:
+        """Add an object to the Gene.
+        In addition to constraints from regular Bundle Gene asserts:
+        1. all objects have the same gene_id
+
+        If constrains fail - does not add object.
+
+        Args:
+            obj (Object): The object to add.
+
+        Returns:
+            bool: True if the object was successfully added, False otherwise.
+        """
         obj_gid = obj.get_attr("gene_id")
         if obj_gid is None:
             return False
@@ -199,16 +247,156 @@ class Gene (Bundle):
         return status
     
     def get_gid(self) -> str:
+        """Get the gene ID of the Gene.
+
+        Returns:
+            str: The gene ID.
+        """
         return self.objects[0].get_gid()
     
-# specialization of a bundle that guarantees that every object that is added overlap the bunle coordinates
-# up to the user to guarantee that transitively overlapping objects are added in the correct order
 class OverlapBundle(Bundle):
+    """
+    Represents a specialization of Bundle where every object added overlaps the bundle coordinates.
+    It is up to the user to guarantee that transitively overlapping objects are added in the correct order
+    """
+
     def __init__(self):
         super().__init__()
 
     def add_object(self,obj: Object) -> bool:
+        """Add an object to the OverlapBundle.
+        In addition to constraints from regular Bundle Gene asserts:
+        1. every added object overlaps the current bundle coordinates.
+
+        If constrains fail - does not add object.
+
+        Args:
+            obj (Object): The object to add.
+
+        Returns:
+            bool: True if the object was successfully added, False otherwise.
+        """
         if self.seqid is None or self.overlaps(obj):
             status = super().add_object(obj)
             return status
-        return False
+        return False    
+
+# largest specialization of the TXGroup which can yield all other types
+class Transcriptome (TXGroup):
+    """
+    Represents the largest specialization of TXGroup that can hold and yield all other types of objects.
+    Can be used to hold all objects together.
+    Useful when loading unsorted files and need to make certain all child-parent relationships are recovered.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def build_from_file(self,fname: str) -> None:
+        """
+        Build the Transcriptome from a file.
+        Will try adding any object to the transcriptome groupping them by transcript id
+        Genes and other collections of objects will be broken down and added as their constituent parts
+
+        Args:
+            fname (str): The file name to read the objects from.
+        """
+        treader = TReader(fname)
+        for obj in treader.next_obj():
+            self.add_object(obj)
+
+        for obj in self.objects:
+            if obj.get_type() == Types.Transcript:
+                obj.finalize()
+
+    def load_expression(self,fname: str) -> None:
+        """
+        Load expression data into the Transcriptome.
+        Expression data is expected to be in the TSV format with column as follows:
+        1. transcript_id
+        2..N expression for each sample
+        Each row is expected to contain the suame number of values
+
+        Args:
+            fname (str): The file name of the expression data in TSV format as described above.
+        """
+        assert os.path.exists(fname),"expression data file not found: "+fname
+
+        num_samples = None
+
+        with open(fname,"r") as inFP:
+            for line in inFP:
+                lcs = line.strip().split("\t")
+                assert len(lcs)>1,"the expressiontable file format is expected to have more than 1 column: 1st columns is transcript ID and each successive column is expression in the sample"
+                if num_samples is None:
+                    num_samples = len(lcs)-1
+                assert num_samples == line(lcs),"number of samples is inconsistend in the expression file. Each row is expected to have the same number of values"
+                
+                cur_tid = lcs[1]
+                idx = self.tid_map.get(cur_tid,None)
+
+                if idx is not None:
+                    for exp in lcs[1:]:
+                        exp = 0
+                        try:
+                            exp = float(exp)
+                        except:
+                            pass
+                        self.objects[idx].add_expression(exp)
+                    
+        
+    def coordinate_sort(self):
+        """
+        Sort the objects in the Transcriptome based on coordinates.
+        """
+        self.objects.sort(key=lambda obj: obj.get_exons())
+        self.reindex()
+
+    def gid_sort(self):
+        """
+        Sort the objects in the Transcriptome based on gene ID.
+        """
+        self.objects.sort(key=lambda obj: obj.get_gid())
+        self.reindex()
+
+    def transcript_it(self):
+        """
+        Iterate over the Transcript objects in the Transcriptome.
+        """
+        for obj in self.object_it():
+            if obj.obj_type == Types.Transcript:
+                yield obj
+
+    def gene_it(self) -> Gene:
+        """
+        Iterate over the Gene objects in the Transcriptome.
+        Does not perform sorting of any kind - users are expected to guarantee themselves that transcriptome is appropriately sorted.
+        """
+        gene = Gene()
+        for obj in self.object_it():
+            if gene.is_empty() or gene.get_gid() == obj.get_gid():
+                gene.add_object(obj)
+            else:
+                yield gene
+                gene = Gene()
+                gene.add_object(obj)
+
+        if not gene.is_empty():
+            yield gene
+
+    def bundle_it(self) -> OverlapBundle:
+        """
+        Creates and yields OverlapBundles.
+        Does not perform sorting of any kind - users are expected to guarantee themselves that transcriptome is appropriately sorted.
+        """
+        bundle = OverlapBundle()
+        for obj in self.object_it():
+            if bundle.is_empty() or bundle.overlaps(obj):
+                bundle.add(obj)
+            else:
+                yield bundle
+                bundle = OverlapBundle()
+                bundle.add(obj)
+
+        if not bundle.is_empty():
+            yield bundle

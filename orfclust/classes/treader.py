@@ -4,32 +4,59 @@ from classes.transcript import GTFObjectFactory, Object
 from utils.common import *
 
 class TReader:
+    """
+    A class to read and validate general structure of GTF/GFF files
+
+    ...
+
+    Attributes
+    ----------
+    fname : str
+        filename of the GTF/GFF file to be read
+    fp : File
+        file handler opened automatically by the TReader when opening the input files
+    gff : bool
+        set to True if the file is detected to be in the GFF format. Set to false if in GTF
+    comments : list
+        list of all comments found in the file is the same order as they were read in the input file.
+
+    Methods
+    -------
+    _set_file(fname="") : None
+        Internal function that sets fname for a TReader object and runs format detection setting the gff attribute accordingly
+    _is_gff() : bool
+        runs automatic detection of the input file format
+    is_gff() : bool
+        returns true if the file is detected to be in GFF format
+    next_obj() : Iterator[Object]
+        advances the file reader by single line skipping comments. Uses a factory to construct appropriate objects
+    """
     def __init__(self,fname:str=None):
         self.fname = ""
         self.fp = None
-        self.gff = True # set to gtf if the file format is detected to be GTF, otherwise is set ot False for GFF
-        self.comments = [] # contains a list of all comment lines encountered in the gtf file (including leading #)
+        self.gff = False
+        self.comments = []
         
         if not fname is None:
-            self.set_file(fname)
+            self._set_file(fname)
 
     def __del__(self):
         if not self.fp is None:
             self.fp.close()
 
-    def set_file(self,fname:str):
+    def _set_file(self,fname:str):
         self.fname = fname
         if self.fp is not None:
             self.fp.close()
 
-        self.gff = self.is_gtf()
+        self.gff = self._is_gtf()
         if self.gff is None:
             raise Exception("File is not a valid GTF or GFF file: "+fname)
         self.fp = open(self.fname,"r")
 
     # function opens the file, peaks inside, and returns True if the file is in GTF format, False if it is in GFF format and None if it is not a valid file
     # will always close the file and re-open it
-    def is_gtf(self) -> bool:
+    def _is_gff(self) -> bool:
         gff = None
         if not self.fp is None:
             self.fp.close()
@@ -63,7 +90,10 @@ class TReader:
         
         self.fp.close()
         self.fp = open(self.fname,"r")
-        return gff
+        return self.is_gff()
+    
+    def is_gff(self):
+        return self.gff
 
     def next_obj(self) -> Iterator[Object]:
         for line in self.fp:
@@ -74,22 +104,3 @@ class TReader:
             obj = GTFObjectFactory.create(line)
             if not obj is None:
                 yield obj
-
-# needs a next_group method
-# the next_group method should yield groups of transcripts based on some metric. The metric should be specified by a comparator function passed to the method
-# for example, we can have a comparator function which returns true if two transcripts have the same ORF and returns false otherwise
-
-
-# transcriptome should be responsible for reading the data
-# perhaps rename into treader instead
-# the goal is to load transcripts into loci (whether by
-
-
-# since we are working with loci instead of a full transcriptome, perhaps isntead of the "yield or next_group" method, we can simply have a method that returns all groups as a collection
-# we can then choose how to iterate or what to do with those groups separately
-
-
-# then the class structure will be
-# TReader
-# Locus
-# Transcript
