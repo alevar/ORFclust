@@ -196,7 +196,7 @@ class Transcript (Object):
     # makes sure that the transcript is complete
     # consider that only a transcript line has been added - this function will create required exons and intervals
     # if exon boundaries and transcript boundaries are out of sync (transcript line describes longer interval than exon chain) - they will be adjusted accordingly
-    def finalize(self, obj: Object, extend: bool=False) -> None: # if extend is enabled - will extend 3' and 5' exons to match the start and end of transcrip, otherwise the transcript start end will be set to match existing start/end exon coordinates instead
+    def finalize(self, extend: bool=False) -> None: # if extend is enabled - will extend 3' and 5' exons to match the start and end of transcrip, otherwise the transcript start end will be set to match existing start/end exon coordinates instead
         assert self.tid == self.attrs["transcript_id"],"transcript_id missing - can not assign"
         if len(self.exons)>0:
             exon_start = sorted(self.exons)[0][0]
@@ -215,14 +215,14 @@ class Transcript (Object):
             obj.set_strand(self.strand)
             obj.set_start(self.start)
             obj.set_end(self.end)
-            obj.set_type("exon")
+            obj.set_type(Types.Exon)
             obj.set_attributes({"transcript_id":self.tid})
             exon = Exon(obj)
             self.exons.addi(self.start,self.end,exon)
 
         # make sure the CDS (if added) fits within exons
         if len(self.cds)>0:
-            assert len(self.exons[self.cds.begin()])>0 and len(self.exons[self.cds.end()])>0,"invalid CDS in detected in transcript when finalizing: "+self.tid
+            assert len(self.exons[self.cds.begin()])>0 and len(self.exons[self.cds.end()-1])>0,"invalid CDS detected in transcript when finalizing: "+self.tid
 
     def clear(self):
         super().clear()
@@ -282,10 +282,10 @@ class Transcript (Object):
                to_attribute_string(self.attrs,False,"transcript")+"\n"
         
         for e in sorted(self.exons):
-            res += e.to_gtf() + "\n"
+            res += e[2].to_gtf() + "\n"
             
         for c in sorted(self.cds):
-            res += c.to_gtf() + "\n"
+            res += c[2].to_gtf() + "\n"
 
         return res.rstrip("\n")
 
@@ -301,10 +301,10 @@ class Transcript (Object):
                to_attribute_string(self.attrs,True,"transcript")+"\n"
         
         for e in sorted(self.exons):
-            res += e.to_gff() + "\n"
+            res += e[2].to_gff() + "\n"
             
         for c in sorted(self.cds):
-            res += c.to_gff() + "\n"
+            res += c[2].to_gff() + "\n"
 
         return res.rstrip("\n")
 
@@ -379,11 +379,7 @@ class Exon(Object):
                 "."+"\t"+\
                 self.strand+"\t"+\
                 "."+"\t"+\
-                "transcript_id \""+self.tid+"\";"
-        if self.gid is not None:
-            res += " gene_id \""+self.gid+"\";"
-        
-        res += to_attribute_string(self.attrs,False,"exon")
+                to_attribute_string(self.attrs,False,"exon")
         return res
     
     def to_gff(self):
@@ -395,11 +391,7 @@ class Exon(Object):
                 "."+"\t"+\
                 self.strand+"\t"+\
                 "."+"\t"+\
-                "Parent="+self.tid+";"
-        if self.gid is not None:
-            res += " gene_id="+self.gid+";"
-        
-        res += to_attribute_string(self.attrs,True,"exon")
+                to_attribute_string(self.attrs,True,"exon")
         return res
     
     __repr__ = to_gtf

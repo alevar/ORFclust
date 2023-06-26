@@ -5,11 +5,12 @@ import sys
 import os
 
 from classes.txgroup import Transcriptome, Gene, Bundle
+from classes.transcript import Transcript
 
 def orfclust(args):
     transcriptome = Transcriptome()
     transcriptome.build_from_file(args.gtf)
-
+    transcriptome.load_expression(args.exp)
     transcriptome.gid_sort()
 
     for gene in transcriptome.gene_it():

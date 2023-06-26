@@ -1,5 +1,8 @@
 from intervaltree import Interval, IntervalTree
 from typing import Iterator
+import random
+import sys
+import os
 
 from classes.treader import TReader
 from classes.transcript import Transcript, Object
@@ -16,13 +19,13 @@ class TXGroup:
     def add_object(self,obj) -> int:
         idx = None
         if obj.get_type() in [Types.Transcript, Types.Exon, Types.CDS]:
-            idx = self.tid_map.setdefault(obj.get_tid,len(self.objects))
+            idx = self.tid_map.setdefault(obj.get_tid(),len(self.objects))
             if len(self.objects) == idx:
                 self.objects.append(Transcript(obj))
             self.objects[idx].add(obj)
         elif obj.get_type() in [Types.Bundle, Types.Gene]:
             for tx in obj.transcript_it():
-                idx = self.tid_map.setdefault(tx.get_tid,len(self.objects))
+                idx = self.tid_map.setdefault(tx.get_tid(),len(self.objects))
                 if len(self.objects) == idx:
                     self.objects.append(Transcript(tx))
                 self.objects[idx].add(tx)
@@ -48,6 +51,7 @@ class TXGroup:
     
     def _sort(self,cmp) -> None:
         self.objects.sort(key=cmp)
+        self.reindex()
 
 
     def to_gtf(self):
@@ -61,6 +65,15 @@ class TXGroup:
         for obj in self.objects:
             res+=obj.to_gtf()
         return res
+
+    # for every object in the object list reconstruct the tidmap
+    def reindex(self):
+        self.tid_map.clear()
+        idx = 0
+        for obj in self.objects:
+            assert obj.get_tid() not in self.tid_map,"duplicate object IDs: "+obj.get_tid()
+            self.tid_map[obj.get_tid()] = idx
+            idx+=1
     
     __repr__ = to_gtf
 
@@ -81,15 +94,27 @@ class Transcriptome (TXGroup):
         treader = TReader(fname)
         for obj in treader.next_obj():
             self.add_object(obj)
+
+        for obj in self.objects:
+            if obj.get_type() == Types.Transcript:
+                obj.finalize()
+
+    # def load_expression(self,fname: str) -> None:
+    #     assert os.path.exists(fname),"expression data file not found: "+fname
+    #     with open(fname,"r") as inFP:
+    #         for line in inFP:
+
         
     def coordinate_sort(self):
         self.objects.sort(key = lambda obj: obj.get_exons())
+        self.reindex()
     def gid_sort(self):
         self.objects.sort(key = lambda obj: obj.get_gid())
+        self.reindex()
             
     def transcript_it(self):
         for obj in self.object_it(): # TODO: types are enumeration shared between all classes
-            if obj.type==Types.Transcript:
+            if obj.obj_type==Types.Transcript:
                 yield obj
                 
     def gene_it(self):
@@ -121,17 +146,20 @@ class Transcriptome (TXGroup):
 # specialization of a Object which guarantees that all objects overlap transitevily. Inherits also from the common object traits such as start,end,overlaps, etc
 class Bundle (TXGroup,Object):
     def __init__(self):
-        super().__init__(self)
-
-# specialization of a Object which guarantees that all objects have the same gene ID. Inherits also from the common object traits such as start,end,overlaps, etc
-class Gene (TXGroup,Object):
-    def __init__(self):
         TXGroup.__init__(self)
         Object.__init__(self)
-        
-        self.intervals = IntervalTree()  # union of all exons in the locus (minus the introns)
+
+        self.intervals = IntervalTree() # union of all exons in the locus (minus the introns)
 
     def add_object(self,obj: Object) -> bool:
+        if self.seqid is None:
+            self.seqid = obj.seqid
+        if self.strand is None:
+            self.strand = obj.strand
+
+        if self.seqid != obj.get_seqid() or self.strand != obj.get_strand():
+            return False
+
         idx = TXGroup.add_object(self,obj)
         
         assert idx is not None,"wrong index in add_object of Gene"
@@ -140,28 +168,47 @@ class Gene (TXGroup,Object):
         self.intervals.update(inserted_obj.get_exons())
         self.intervals.merge_overlaps()
 
+        self.start = min(self.start, obj.get_start())
+        self.end = max(self.end, obj.get_end())
 
-    # adds a transcript to the current locus
-    def add_tx(self, tx: Transcript) -> None:
-        assert self.seqid is None or self.seqid == tx.get_seqid(), "mismatching seqids: "+tx.get_tid()
-        assert self.strand is None or self.strand == tx.get_strand(), "mismatching strands: "+tx.get_tid()
-
-        self.seqid = tx.get_seqid()
-        self.strand = tx.get_strand()
-
-        self.intervals.update(tx.exons)
-        self.intervals.merge_overlaps()
-
-        self.start = min(self.start, tx.start)
-        self.end = max(self.end, tx.end)
-
-        self.txs.append(tx)
-
-        return
+        return True
     
     def get_start(self) -> int:
         return self.start
     def get_end(self) -> int:
         return self.end
+
+# specialization of a Bundle which guarantees that all objects have the same gene ID. Inherits also from the common object traits such as start,end,overlaps, etc
+class Gene (Bundle):
+    def __init__(self):
+        super().__init__()
+        self.gid = None
+
+    def add_object(self,obj: Object) -> bool:
+        obj_gid = obj.get_attr("gene_id")
+        if obj_gid is None:
+            return False
+        
+        if self.gid is None:
+            self.gid = obj_gid
+
+        if self.gid != obj_gid:
+            return False
+        
+        status = super().add_object(obj)
+        return status
+    
     def get_gid(self) -> str:
         return self.objects[0].get_gid()
+    
+# specialization of a bundle that guarantees that every object that is added overlap the bunle coordinates
+# up to the user to guarantee that transitively overlapping objects are added in the correct order
+class OverlapBundle(Bundle):
+    def __init__(self):
+        super().__init__()
+
+    def add_object(self,obj: Object) -> bool:
+        if self.seqid is None or self.overlaps(obj):
+            status = super().add_object(obj)
+            return status
+        return False
