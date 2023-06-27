@@ -855,7 +855,7 @@ class Exon(Object):
 
 class CDS(Exon):
     def __init__(self):
-        Exon.__init__(self)
+        Object.__init__(self)
         self.tid = None
         self.gid = None
 
@@ -871,7 +871,7 @@ class CDS(Exon):
             Exception: If a wrong object type is passed to the constructor.
 
         """
-        Exon.__init__(self)
+        Object.__init__(self)
         self.tid = None
         self.gid = None
 

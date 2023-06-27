@@ -10,11 +10,14 @@ from classes.transcript import Transcript
 def orfclust(args):
     transcriptome = Transcriptome()
     transcriptome.build_from_file(args.gtf)
-    transcriptome.load_expression(args.exp)
+    if args.exp is not None:
+        transcriptome.load_expression(args.exp)
     transcriptome.gid_sort()
 
     for gene in transcriptome.gene_it():
-        print(gene)
+        # print(gene)
+        for tx in gene.object_it():
+            print(tx)
 
 def main(args):
     parser = argparse.ArgumentParser(description='''Help Page''')

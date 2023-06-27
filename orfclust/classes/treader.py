@@ -49,7 +49,7 @@ class TReader:
         if self.fp is not None:
             self.fp.close()
 
-        self.gff = self._is_gtf()
+        self.gff = self._is_gff()
         if self.gff is None:
             raise Exception("File is not a valid GTF or GFF file: "+fname)
         self.fp = open(self.fname,"r")

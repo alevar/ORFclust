@@ -114,7 +114,8 @@ class TXGroup:
         """
         res = ""
         for obj in self.objects:
-            res+=obj.to_gtf()
+            res+=obj.to_gtf()+"\n"
+        res.rstrip("\n")
         return res
     
     def to_gff(self):
@@ -126,7 +127,8 @@ class TXGroup:
         """
         res = ""
         for obj in self.objects:
-            res+=obj.to_gtf()
+            res+=obj.to_gtf()+"\n"
+        res.rstrip("\n")
         return res
 
     # for every object in the object list reconstruct the tidmap
@@ -160,7 +162,7 @@ class Bundle (TXGroup,Object):
 
         self.intervals = IntervalTree() # union of all exons in the locus (minus the introns)
 
-    def add_object(self,obj: Object) -> bool:
+    def  add_object(self,obj: Object) -> bool:
         """
         Add an object to the Bundle.
         Only adds if satisfies basic Bundle constraints:
@@ -302,7 +304,11 @@ class Transcriptome (TXGroup):
             fname (str): The file name to read the objects from.
         """
         treader = TReader(fname)
+        prev_seqid = None
         for obj in treader.next_obj():
+            # if prev_seqid != obj.get_seqid():
+            #     prev_seqid = obj.get_seqid()
+            #     print(prev_seqid)
             self.add_object(obj)
 
         for obj in self.objects:
