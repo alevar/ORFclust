@@ -28,6 +28,46 @@ class Object:
         self.attrs.clear()
         self.expression = list()
 
+    def to_transcript(self) -> 'Transcript':
+        """
+        Convert the object to a Transcript object.
+
+        Returns:
+            Transcript: A Transcript object.
+        """
+        tx = Transcript()
+        tx.set_seqid(self.seqid)
+        tx.set_strand(self.strand)
+        tx.set_source(self.source)
+        tx.set_type(Types.Transcript)
+        tx.set_start(self.start)
+        tx.set_end(self.end)
+        tx.set_attributes(self.attrs)
+        tx.set_tid(self.attrs["transcript_id"])
+        tx.set_gid(self.attrs.get("gene_id", None))
+        tx.set_expression(self.expression)
+        return tx
+    
+    def to_exon(self) -> 'Exon':
+        """
+        Convert the object to an Exon object.
+
+        Returns:
+            Exon: An Exon object.
+        """
+        exon = Exon()
+        exon.set_seqid(self.seqid)
+        exon.set_strand(self.strand)
+        exon.set_source(self.source)
+        exon.set_type(Types.Exon)
+        exon.set_start(self.start)
+        exon.set_end(self.end)
+        exon.set_attributes(self.attrs)
+        exon.set_tid(self.attrs["transcript_id"])
+        exon.set_gid(self.attrs.get("gene_id", None))
+        exon.set_expression(self.expression)
+        return exon
+
     def is_empty(self) -> bool:
         """
         Check if the object is empty.
@@ -168,6 +208,18 @@ class Object:
         """
         self.expression.append(exp)
 
+    def set_expression(self, exps: list) -> None:
+        """
+        Set the expression values of the object.
+
+        Args:
+            exp (list): A list of expression values.
+
+        Returns:
+            None
+        """
+        self.expression = exps
+
     def get_source(self) -> str:
         """
         Get the source of the object.
@@ -280,12 +332,15 @@ class Object:
 
         if lcs[2] == "transcript":
             self.obj_type = Types.Transcript
+            self.attrs = rename_attributes(self.attrs,{"ID":"transcript_id","Parent":"gene_id"})
         elif lcs[2] == "exon":
             self.obj_type = Types.Exon
+            self.attrs = rename_attributes(self.attrs,{"Parent":"transcript_id"})
         elif lcs[2] == "CDS":
             self.obj_type = Types.CDS
+            self.attrs = rename_attributes(self.attrs,{"Parent":"transcript_id"})
         else:
-            raise Exception("Wrong object type passed to Object.add_line()")
+            self.obj_type = Types.Other
         
         return True
     
@@ -321,80 +376,44 @@ class Transcript (Object):
         Object
 
     """
-    def __init__(self):
+    def __init__(self, obj: Object=None):
         super().__init__()
-
+        self.tid = None
+        self.gid = None
         self.obj_type = Types.Transcript
         self.exons = IntervalTree()
         self.cds = IntervalTree()
 
-    def __init__(self, obj: Object):
-        super().__init__()
+        if obj is not None:
+            self.__dict__ = obj.to_transcript().__dict__.copy()
 
-        self.obj_type = Types.Transcript
-        self.seqid = obj.seqid
-        self.strand = obj.strand
-        self.source = obj.source
-
-        self.exons = IntervalTree()
-        self.cds = IntervalTree()
-
-        if obj.get_type() == Types.Transcript:
-            self.from_transcript(obj)
-        elif obj.get_type() == Types.Exon or obj.get_type() == Types.CDS:
-            self.from_exon(obj)
-        else:
-            raise Exception("Wrong object type passed to Transcript constructor")
-
-    def from_transcript(self, obj: Object) -> None:
+    def merge(self,obj: Object):
         """
-        Initialize the Transcript object from a general object with Transcript object.
-
-        Args:
-            obj (Object): Object with type Transcript.
-
-        Returns:
-            None
-
-        """
-        assert obj.get_type() == Types.Transcript,"wrong object type passed to Transcript constructor"
+        Merge object into the transcript. Ensured transcript_ids match. Can merge Exons, CDS, and Transcripts into the Transcript.
         
-        self.attrs = rename_attributes(obj.attrs,{"ID":"transcript_id","Parent":"gene_id"})
-
-        assert "transcript_id" in self.attrs,"transcript_id not found in attributes"
-        assert "gene_id" in self.attrs,"gene_id not found in attributes"
-        self.tid = self.attrs.get("transcript_id",None)
-        self.gid = self.attrs.get("gene_id",None)
-
-        self.start = obj.start
-        self.end = obj.end
-
-    def from_exon(self, obj: Object) -> None:
-        """
-        Initialize the Transcript object from an Exon or CDS object.
-
         Args:
-            obj (Object): The Exon or CDS object.
-
-        Returns:
-            None
-
+            obj (Object): The Object to merge.
         """
-        assert obj.get_type() in [Types.Exon, Types.CDS],"wrong object type passed to Transcript constructor"
-        
-        self.attrs = rename_attributes(obj.attrs,{"Parent":"transcript_id"})
+        assert self.tid is None or self.tid == obj.get_attr("transcript_id"), "Transcript IDs do not match"
+        assert self.gid is None or self.gid == obj.get_attr("gene_id"), "Gene IDs do not match"
+        assert self.seqid is None or self.seqid == obj.get_seqid(), "Sequence IDs do not match"
+        assert self.strand is None or self.strand == obj.get_strand(), "Strands do not match"
 
-        assert "transcript_id" in self.attrs,"transcript_id not found in attributes"
-        self.tid = self.attrs.get("transcript_id",None)
-        if "gene_id" in self.attrs:
-            self.gid = self.attrs.get("gene_id",None)
+        for k,v in obj.get_attributes().items():
+            self.add_attribute(k,v)
+        if obj.get_type() == Types.Exon:
+            self.add_exon(obj)
+        elif obj.get_type() == Types.CDS:
+            self.add_cds(obj)
+        elif obj.get_type() == Types.Transcript:
+            for exon in obj.get_exons():
+                self.add_exon(exon)
+            for cds in obj.get_cds():
+                self.add_cds(cds)
 
-        self.start = obj.start
-        self.end = obj.end
-
-    def add(self,obj: Object) -> bool: # returns True if sucessfully added
+    def add_exon(self,obj: Object) -> bool: # returns True if sucessfully added
         """
-        Add an Object to the Transcript. Objects are sorted accordingly to update coordinates, boundaries, exon and cds chains
+        Add an Exon to the Transcript. Objects are sorted accordingly to update coordinates, boundaries, exon and cds chains
 
         Args:
             obj (Object): The Object to add.
@@ -408,17 +427,32 @@ class Transcript (Object):
         if self.tid != obj.get_attr("transcript_id"):
             return False
         
-        if obj.get_type() == Types.Transcript:
-            self.start = min(self.start,obj.get_start())
-            self.end = max(self.end,obj.get_end())
-            for k,v in obj.get_attributes().items():
-                self.add_attribute(k,v)
-        elif obj.get_type() == Types.Exon:
-            self.start = min(self.start,obj.get_start())
-            self.end = max(self.end,obj.get_end())
-            self.exons.addi(obj.get_start(),obj.get_end(),obj)
-        elif obj.get_type() == Types.CDS:
-            self.cds.addi(obj.get_start(),obj.get_end(),obj)
+        exon = obj.to_exon()
+        self.start = min(self.start,exon.get_start())
+        self.end = max(self.end,exon.get_end())
+        self.exons.addi(exon.get_start(),exon.get_end(),exon)
+
+        return True
+    
+    def add_cds(self,obj: Object) -> bool: # returns True if sucessfully added
+        """
+        Add an CDS to the Transcript. Objects are sorted accordingly to update coordinates, boundaries, exon and cds chains
+
+        Args:
+            obj (Object): The Object to add.
+
+        Returns:
+            bool: True if the Object was successfully added, False otherwise.
+
+        """
+        if self.strand != obj.get_strand() or self.seqid != obj.get_seqid():
+            return False
+        if self.tid != obj.get_attr("transcript_id"):
+            return False
+        
+        cds = CDS(obj.to_exon())
+        assert cds.get_start() >= self.start and cds.get_end() <= self.end,"CDS out of transcript boundaries"
+        self.cds.addi(cds.get_start(),cds.get_end(),cds)
 
         return True
 
@@ -464,6 +498,34 @@ class Transcript (Object):
         if len(self.cds)>0:
             assert len(self.exons[self.cds.begin()])>0 and len(self.exons[self.cds.end()-1])>0,"invalid CDS detected in transcript when finalizing: "+self.tid
 
+    def to_exon(self) -> 'Exon':
+        """
+        Convert the Transcript to an Exon.
+
+        Returns:
+            Exon: The Exon.
+
+        """
+        obj = Object()
+        obj.set_seqid(self.seqid)
+        obj.set_strand(self.strand)
+        obj.set_start(self.start)
+        obj.set_end(self.end)
+        obj.set_type(Types.Exon)
+        obj.set_attributes({"transcript_id":self.tid})
+        exon = Exon(obj)
+        return exon
+    
+    def to_transcript(self) -> 'Transcript':
+        """
+        Convert the Transcript to a Transcript.
+
+        Returns:
+            Transcript: The Transcript.
+
+        """
+        return self
+    
     def clear(self):
         """
         Clear the Transcript object.
@@ -706,14 +768,8 @@ class Exon(Object):
         Object
 
     """
-    def __init__(self):
-        super().__init__()
-        self.tid = None
-        self.gid = None
 
-        self.obj_type = Types.Exon
-
-    def __init__(self,obj: Object):
+    def __init__(self,obj: Object=None):
         """Initialize an Exon object.
 
         Args:
@@ -724,40 +780,11 @@ class Exon(Object):
 
         """
         super().__init__()
+        self.obj_type = Types.Exon
         self.tid = None
         self.gid = None
-
-        self.obj_type = Types.Exon
-        self.seqid = obj.seqid
-        self.strand = obj.strand
-        self.source = obj.source
-        
-        if obj.get_type() == Types.Exon:
-            self.from_exon(obj)
-        else:
-            raise Exception("wrong object type passed to Exon constructor")
-
-    def from_exon(self, obj):
-        """Initialize the Exon from an Object.
-
-        Args:
-            obj (Object): The Object to initialize the Exon from.
-
-        Raises:
-            AssertionError: If a wrong object type is passed to the method.
-
-        """
-        assert obj.get_type() == Types.Exon or obj.get_type() ==  Types.CDS,"wrong object type passed to Transcript constructor"
-        
-        self.attrs = rename_attributes(obj.attrs,{"Parent":"transcript_id"})
-
-        assert "transcript_id" in self.attrs,"transcript_id not found in attributes"
-        self.tid = self.attrs.get("transcript_id",None)
-        if "gene_id" in self.attrs:
-            self.gid = self.attrs.get("gene_id",None)
-
-        self.start = obj.start
-        self.end = obj.end
+        if obj is not None:
+            self.__dict__ = obj.to_exon().__dict__.copy()
 
     def set_tid(self, tid: str) -> None:
         """Set the transcript ID.
@@ -854,14 +881,8 @@ class Exon(Object):
     __str__ = __repr__
 
 class CDS(Exon):
-    def __init__(self):
-        Object.__init__(self)
-        self.tid = None
-        self.gid = None
 
-        self.obj_type = Types.CDS
-
-    def __init__(self,obj: Object):
+    def __init__(self,obj: Object=None):
         """Initialize a CDS object.
 
         Args:
@@ -871,16 +892,8 @@ class CDS(Exon):
             Exception: If a wrong object type is passed to the constructor.
 
         """
-        Object.__init__(self)
-        self.tid = None
-        self.gid = None
-
+        super().__init__(obj)
         self.obj_type = Types.CDS
-        
-        if obj.get_type() == Types.CDS:
-            self.from_exon(obj)
-        else:
-            raise Exception("wrong object type passed to CDS constructor")
 
 class GTFObjectFactory:
     """
@@ -902,9 +915,9 @@ class GTFObjectFactory:
         obj = Object()
         obj.add_line(line)
         if obj.get_type() == Types.Transcript:
-            return Transcript(obj)
+            return obj.to_transcript()
         elif obj.get_type() == Types.Exon:
-            return Exon(obj)
+            return obj.to_exon()
         elif obj.get_type() == Types.CDS:
             return CDS(obj)
         else:

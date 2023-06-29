@@ -43,13 +43,13 @@ class TXGroup:
             idx = self.tid_map.setdefault(obj.get_tid(),len(self.objects))
             if len(self.objects) == idx:
                 self.objects.append(Transcript(obj))
-            self.objects[idx].add(obj)
+            else:
+                self.objects[idx].merge(obj)
         elif obj.get_type() in [Types.Bundle, Types.Gene]:
             for tx in obj.transcript_it():
                 idx = self.tid_map.setdefault(tx.get_tid(),len(self.objects))
-                if len(self.objects) == idx:
-                    self.objects.append(Transcript(tx))
-                self.objects[idx].add(tx)
+                assert len(self.objects) == idx,"Transcript ID already exists in the objects list"
+                self.objects.append(tx)
         else:
             raise Exception("Wrong object type provided to the add_object methods of TXGroup")
         
@@ -187,9 +187,8 @@ class Bundle (TXGroup,Object):
         idx = TXGroup.add_object(self,obj)
         
         assert idx is not None,"wrong index in add_object of Gene"
-        inserted_obj = self.objects[idx]
 
-        self.intervals.update(inserted_obj.get_exons())
+        self.intervals.update(obj.get_exons())
         self.intervals.merge_overlaps()
 
         self.start = min(self.start, obj.get_start())

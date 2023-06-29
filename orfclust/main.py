@@ -15,9 +15,7 @@ def orfclust(args):
     transcriptome.gid_sort()
 
     for gene in transcriptome.gene_it():
-        # print(gene)
-        for tx in gene.object_it():
-            print(tx)
+        print(gene)
 
 def main(args):
     parser = argparse.ArgumentParser(description='''Help Page''')
