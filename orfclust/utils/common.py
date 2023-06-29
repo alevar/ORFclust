@@ -19,6 +19,8 @@ import numpy as np
 import pandas as pd
 from enum import Enum, auto
 
+from typing import Tuple,List
+
 class Types (Enum):
     Transcript = auto(),
     MRNA = auto(),
@@ -29,7 +31,8 @@ class Types (Enum):
     Gene = auto(),
     Exon = auto(),
     CDS = auto(),
-    Intron = auto()
+    Intron = auto(),
+    Other = auto()
 
     @staticmethod
     def str2type(type_str: str):
@@ -83,12 +86,18 @@ class Types (Enum):
             raise ValueError("unknown type: "+str(type))
 
 
-gff3cols = ["seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes"]
+gff3cols = ["seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes"] # columns in a GFF3 file
 
-def common_print(fname):
-    print("common: "+fname)
+def load_fasta_dict(fa_fname: str, rev: bool=False, upper: bool=False) -> dict:
+    """
+    loads a fasta file into a dictionary
+    Args:
+        fa_fname: fasta file name
+        rev: if True, returns a dictionary with sequences as keys and names as values
+        upper: if True, converts all sequences to upper case
 
-def load_fasta_dict(fa_fname, rev=False, upper=False):
+    Returns: dictionary with names as keys and sequences as values
+    """
     res = dict()
     with open(fa_fname, "r") as inFP:
         cur_nm = None
@@ -110,16 +119,15 @@ def load_fasta_dict(fa_fname, rev=False, upper=False):
         res = im
     return res
 
+def intersect(s1: Tuple[int,...], s2: Tuple[int,...]) -> Tuple[int,Tuple[int,int,int]]:
+    """
+    returns the intersection of two intervals
+    Args:
+        s1: first interval
+        s2: second interval
 
-def get_gff3cols():
-    return gff3cols
-
-
-def test_defs():  # simple test to check whether the file has been loaded
-    print("test passed")
-
-
-def intersect(s1, s2):
+    Returns: length of the intersection and the intersection itself
+    """
     res = [0, -1, 0]
     tis = max(s1[0], s2[0])
     tie = min(s1[1], s2[1])
@@ -129,8 +137,15 @@ def intersect(s1, s2):
         return (tie - tis) + 1, res
     return 0, res
 
+def split(s1: Tuple[int,...], s2: Tuple[int,...]) -> Tuple[Tuple[int,int,int],Tuple[int,int,int],Tuple[int,int,int]]:
+    """
+    splits the first interval into three intervals: left, intersection, right
+    Args:
+        s1: first interval
+        s2: second interval
 
-def split(s1, s2):
+    Returns: left, intersection, right
+    """
     left = [0, -1, -1]
     right = [0, -1, -1]
 
@@ -153,18 +168,38 @@ def split(s1, s2):
     return left, inter, right
 
 
-def slen(s):
+def slen(s: Tuple[int,...]) -> int:
+    """
+    returns the length of an interval
+    Args:
+        s: interval
+    Returns: length of the interval
+    """
     return (s[1] - s[0]) + 1
 
 
-def clen(chain):
+def clen(chain: List[Tuple[int,...]]) -> int:
+    """
+    returns the length of a chain of intervals
+    Args:
+        chain: chain of intervals
+    Returns: length of the chain
+    """
     res = 0
     for c in chain:
         res += slen(c)
     return res
 
 
-def compare(i1, i2):
+def compare(i1: List[Tuple[int,...]], i2: List[Tuple[int,...]]) -> List[Tuple[int,int,int]]:
+    """
+    compares two chains of intervals
+    Args:
+        i1: first chain of intervals
+        i2: second chain of intervals
+
+    Returns: TODO:
+    """
     intervals = []
     for i in i1:
         intervals.append([i[0], i[1]])
@@ -281,17 +316,17 @@ def compare_and_extract(chain1, chain2, strand):
             print("wrong code")
             return
 
-    # compute lpd, ilpd, mlpd, etc
-    lpd = int((100.0 * (float(c1len) / float(c2len))))
-    ilpd = int((100.0 * (float(num_bp_inframe) / float(c2len))))
-    mlpd = int((100.0 * (float(num_bp_match) / float(c2len))))
+    # compute lpi, ilpi, mlpi, etc
+    lpi = int((100.0 * (float(c1len) / float(c2len))))
+    ilpi = int((100.0 * (float(num_bp_inframe) / float(c2len))))
+    mlpi = int((100.0 * (float(num_bp_match) / float(c2len))))
 
     match_start = chain1[0][0] == chain2[0][0] if strand == '+' else chain1[-1][1] == chain2[-1][1]
     match_end = chain1[-1][1] == chain2[-1][1] if strand == '+' else chain1[0][0] == chain2[0][0]
 
     return pd.Series(
         [mod_chain, c1len, c2len, match_start, match_end, num_bp_extra, num_bp_missing, num_bp_inframe, num_bp_match,
-         num_bp_outframe, lpd, ilpd, mlpd])
+         num_bp_outframe, lpi, ilpi, mlpi])
 
 
 def load_tid2aa(fname):
