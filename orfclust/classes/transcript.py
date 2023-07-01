@@ -1,5 +1,6 @@
 from intervaltree import Interval, IntervalTree
 from utils.common import *
+from typing import Tuple,List
 
 class Object:
     def __init__(self):
@@ -343,6 +344,25 @@ class Object:
             self.obj_type = Types.Other
         
         return True
+    
+    def _getattr(self, name):
+        """
+        Allows queries of both the object and the attributes parsed from the file
+        """
+        try:
+            return getattr(self,name)
+        except:
+            if name in self.attrs:
+                return self.attrs[name]
+            else:
+                raise AttributeError(f"'Object' object has no attribute '{name}'")
+            
+    def _getattrs(self,attrs: str | List) -> Tuple:
+        """
+        Able to return one or more attributes at once. Used when sorting or groupping by multiple keys.
+        """
+        return tuple([self._getattr(attr) for attr in attrs] if isinstance(attrs, list) else [self._getattr(attrs)])
+
     
     def copy(self):
         """

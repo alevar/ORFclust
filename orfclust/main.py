@@ -15,7 +15,14 @@ def orfclust(args):
     transcriptome.gid_sort()
 
     for gene in transcriptome.gene_it():
-        print(gene)
+        groupper = ["cds","gene_id"]
+        if args.mode == "FUNC":
+            groupper = "cds"
+        for grp_id,grp in gene.group_by(groupper):
+            print(grp_id)
+
+            # we now need to select representative transcript for each group and accumulate expression data
+
 
 def main(args):
     parser = argparse.ArgumentParser(description='''Help Page''')

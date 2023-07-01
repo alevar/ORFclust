@@ -1,5 +1,5 @@
 from intervaltree import Interval, IntervalTree
-from typing import Iterator
+from typing import Iterator, List
 import random
 import sys
 import os
@@ -84,14 +84,38 @@ class TXGroup:
             bool: True if the TXGroup is empty, False otherwise.
         """
         return len(self.objects) == 0
+    
+    def group_by(self,by) -> None:
+        """
+        Sorts objects internally according to the desired criteria and then yields groups of them
 
-    def sort(self) -> None:
+        Args:
+            by (str, optional): The criteria to group by..
+        """
+
+        self.sort(by)
+
+        prev_key = None
+        group = TXGroup()
+
+        for obj in self.objects:
+            key = obj._getattrs(by)
+            if key != prev_key:
+                if not group.is_empty():
+                    yield prev_key, group
+                group = TXGroup()
+            group.add_object(obj)
+            prev_key = key
+        if not group.is_empty():
+            yield prev_key, group
+
+    def sort(self,by: str | List) -> None:
         """
         Sort the objects in the TXGroup.
+        Args:
+            by (str or list, required): The criteria to sort by.
         """
-        assert False,"General object sort method is not currently implemented"
-        # TODO: do we need other sorting methods?
-        cmp = lambda obj: obj.get_cds()
+        cmp = lambda obj: obj._getattrs(by)
         self._sort(cmp)
     
     def _sort(self,cmp) -> None:
