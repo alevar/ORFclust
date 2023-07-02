@@ -1,5 +1,5 @@
 from intervaltree import Interval, IntervalTree
-from typing import Iterator, List
+from typing import Iterator, List, Callable
 import random
 import sys
 import os
@@ -67,14 +67,21 @@ class TXGroup:
         """
         return self.objects[idx]
         
-    def object_it(self):
+    def object_it(self, func: Callable=None) -> Iterator[Object]:
         """
         Iterate over all objects in the TXGroup.
         Specific implementations of the TXGroup may provide specialized implementations such as transcdrip_it which yield subsets of the objects.
         This one should not be overwritten.
+
+        Args:
+            func (Callable, optional): A function to apply to each object before yielding it. If function returns False, the object is skipped.keep
         """
-        for obj in self.objects:
-            yield obj
+        if func is None:
+            yield from self.objects
+        else:
+            for obj in self.objects:
+                if func(obj):
+                    yield obj
 
     def is_empty(self) -> bool:
         """
@@ -359,16 +366,16 @@ class Transcriptome (TXGroup):
                 assert len(lcs)>1,"the expressiontable file format is expected to have more than 1 column: 1st columns is transcript ID and each successive column is expression in the sample"
                 if num_samples is None:
                     num_samples = len(lcs)-1
-                assert num_samples == line(lcs),"number of samples is inconsistend in the expression file. Each row is expected to have the same number of values"
+                assert num_samples == len(lcs)-1,"number of samples is inconsistend in the expression file. Each row is expected to have the same number of values"
                 
-                cur_tid = lcs[1]
+                cur_tid = lcs[0]
                 idx = self.tid_map.get(cur_tid,None)
 
                 if idx is not None:
-                    for exp in lcs[1:]:
+                    for expstr in lcs[1:]:
                         exp = 0
                         try:
-                            exp = float(exp)
+                            exp = float(expstr)
                         except:
                             pass
                         self.objects[idx].add_expression(exp)

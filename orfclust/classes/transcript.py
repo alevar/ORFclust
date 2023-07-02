@@ -1,6 +1,7 @@
 from intervaltree import Interval, IntervalTree
 from utils.common import *
-from typing import Tuple,List
+from typing import Tuple,List, Callable
+import copy
 
 class Object:
     def __init__(self):
@@ -296,14 +297,17 @@ class Object:
         """
         return self.attrs
 
-    def get_expression(self) -> list:
+    def get_expression(self,func: Callable=None) -> list:
         """
         Get the expression values of the object.
+
+        Args:
+            func (Callable, optional): A function to apply to the expression values. Defaults to None.
 
         Returns:
             list: A list of expression values.
         """
-        return self.expression
+        return func(self.expression) if func is not None else self.expression
 
     def add_line(self,gtf_line:str,store_all_attributes=False) -> bool:
         """
@@ -362,7 +366,6 @@ class Object:
         Able to return one or more attributes at once. Used when sorting or groupping by multiple keys.
         """
         return tuple([self._getattr(attr) for attr in attrs] if isinstance(attrs, list) else [self._getattr(attrs)])
-
     
     def copy(self):
         """
@@ -382,6 +385,15 @@ class Object:
         obj.set_end(self.end)
         obj.expression = [x for x in self.expression]
         return obj
+    
+    def len(self):
+        """
+        Get the length of the object.
+
+        Returns:
+            int: The length of the object.
+        """
+        return self.end-self.start
 
 class Transcript (Object):
     """
@@ -573,7 +585,9 @@ class Transcript (Object):
             None
 
         """
-        self.exons = IntervalTree.from_tuples(exons)
+        self.exons = IntervalTree.from_tuples(copy.deepcopy(exons))
+        for e in self.exons:
+            e[2].set_type(Types.Exon)
 
     def set_cds(self, cds: list[tuple[int, int]]) -> None:
         """
@@ -776,6 +790,24 @@ class Transcript (Object):
         tx.set_exons(self.exons)
         tx.set_cds(self.cds)
         return tx
+    
+    def elen(self) -> int:
+        """Get effective length of the transcript in base pairs.
+
+        Returns:
+            int: The length of the transcript.
+
+        """
+        return sum([e[2].len() for e in self.exons])
+    
+    def clen(self) -> int:
+        """Get coding length of the transcript in base pairs.
+
+        Returns:
+            int: The length of the ORF.
+
+        """
+        return sum([c[2].len() for c in self.cds])
     
 class Exon(Object):
     """
