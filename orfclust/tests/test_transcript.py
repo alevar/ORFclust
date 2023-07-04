@@ -1,15 +1,100 @@
 import unittest
 
 from classes.transcript import GTFObjectFactory, Object, Transcript, Exon, CDS
+from utils.common import *
 
-class MyTestCase(unittest.TestCase):
-    def test_create_transcript_1(self):
-        line = """chr1    ORFclust        transcript      17308197        17356057        .       +       .       transcript_id "rna-XM_011541154.3"; gene_id "gene-PADI4"; gene_name "PADI4"; description "peptidyl arginine deiminase 4"; CDS_Dbxref "GeneID:23569,Genbank:XP_011539456.1,HGNC:HGNC:18368,MIM:605347"; CDS_Name "XP_011539456.1"; CDS_gbkey "CDS"; CDS_product "protein-arginine deiminase type-4 isoform X4"; Dbxref "GeneID:23569,Genbank:XM_011541154.3,HGNC:HGNC:18368,MIM:605347"; Name "XM_011541154.3"; gbkey "mRNA"; gene "PADI4"; gene_biotype "protein_coding"; gene_synonym "PAD,PAD4,PADI5,PDI4,PDI5"; model_evidence "Supporting evidence includes similarity to: 17 ESTs%2C 1 long SRA read%2C and 100%25 coverage of the annotated genomic feature by RNAseq alignments%2C including 3 samples with support for all annotated introns"; product "peptidyl arginine deiminase 4%2C transcript variant X5"; protein_id "XP_011539456.1"; transcriptID "XM_011541154.3";"""
-        
+class TestObject(unittest.TestCase):
+    def test_add_line_transcript(self):
+        # Test adding a GTF line representing a transcript
+        gtf_line = """chr1\tORFclust\ttranscript\t100\t200\t.\t+\t.\tgene_id "123"; transcript_id "456";"""
         obj = Object()
-        obj.add_line(line)
-        tx = Transcript(obj)
-        self.assertEqual(True, True)
+        result = obj.add_line(gtf_line)
+        
+        self.assertTrue(result)
+        self.assertEqual(obj.get_type(), Types.Transcript)
+        self.assertEqual(obj.get_seqid(), "chr1")
+        self.assertEqual(obj.get_start(), 100)
+        self.assertEqual(obj.get_end(), 201)  # Non-inclusive end
+        self.assertEqual(obj.get_attr("gene_id"), "123")
+        self.assertEqual(obj.get_attr("transcript_id"), "456")
+
+    def test_add_line_exon(self):
+        # Test adding a GTF line representing an exon
+        gtf_line = """chr1\tORFclust\texon\t150\t180\t.\t+\t.\tgene_id "123"; transcript_id "456";"""
+        obj = Object()
+        result = obj.add_line(gtf_line)
+        
+        self.assertTrue(result)
+        self.assertEqual(obj.get_type(), Types.Exon)
+        self.assertEqual(obj.get_seqid(), "chr1")
+        self.assertEqual(obj.get_start(), 150)
+        self.assertEqual(obj.get_end(), 181)  # Non-inclusive end
+        self.assertEqual(obj.get_attr("gene_id"), "123")
+        self.assertEqual(obj.get_attr("transcript_id"), "456")
+
+    def test_to_transcript(self):
+        # Test converting the object to a Transcript object
+        obj = Object()
+        obj.set_seqid("chr1")
+        obj.set_start(100)
+        obj.set_end(200)
+        obj.set_type(Types.Transcript)
+        obj.add_attribute("gene_id", "123")
+        obj.add_attribute("transcript_id", "456")
+        
+        transcript = obj.to_transcript()
+        
+        self.assertEqual(transcript.get_seqid(), "chr1")
+        self.assertEqual(transcript.get_start(), 100)
+        self.assertEqual(transcript.get_end(), 200)
+        self.assertEqual(transcript.get_type(), Types.Transcript)
+        self.assertEqual(transcript.get_attr("gene_id"), "123")
+        self.assertEqual(transcript.get_attr("transcript_id"), "456")
+
+    def test_overlaps(self):
+        # Test checking if the object overlaps with another object
+        obj1 = Object()
+        obj1.set_start(100)
+        obj1.set_end(200)
+        
+        obj2 = Object()
+        obj2.set_start(150)
+        obj2.set_end(250)
+        
+        obj3 = Object()
+        obj3.set_start(300)
+        obj3.set_end(400)
+        
+        self.assertTrue(obj1.overlaps(obj2))
+        self.assertTrue(obj2.overlaps(obj1))
+        self.assertFalse(obj1.overlaps(obj3))
+        self.assertFalse(obj3.overlaps(obj1))
+
+class TestTranscript(unittest.TestCase):
+    def test_setup(self):
+        gtf_line = """chr1\tORFclust\ttranscript\t100\t200\t.\t+\t.\tgene_id "123"; transcript_id "456";"""
+        self.transcript = Transcript()
+        self.transcript.add_line(gtf_line)
+        self.exon1 = Exon()
+        self.exon2 = Exon()
+        self.exon3 = Exon()
+        self.transcript.add_exon(self.exon1)
+        self.transcript.add_exon(self.exon2)
+        self.transcript.add_exon(self.exon3)
+
+    def test_add_cds(self):
+        gtf_line = """chr1\tORFclust\ttranscript\t100\t200\t.\t+\t.\tgene_id "123"; transcript_id "456";"""
+        self.transcript = Transcript()
+        self.transcript.add_line(gtf_line)
+        cds = [(10, 20), (30, 40)]
+        self.transcript.set_cds(cds)
+        cds_regions = self.transcript.get_cds()
+        print(cds_regions)
+        self.assertEqual(len(cds_regions), 2)
+        self.assertEqual(cds_regions[0][2].get_start(), 10)
+        self.assertEqual(cds_regions[0][2].get_end(), 20)
+        self.assertEqual(cds_regions[1][2].get_start(), 30)
+        self.assertEqual(cds_regions[1][2].get_end(), 40)
 
 if __name__ == '__main__':
     unittest.main()

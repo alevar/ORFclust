@@ -116,7 +116,7 @@ class TXGroup:
         if not group.is_empty():
             yield prev_key, group
 
-    def sort(self,by: str | List) -> None:
+    def sort(self,by) -> None:
         """
         Sort the objects in the TXGroup.
         Args:
@@ -336,9 +336,6 @@ class Transcriptome (TXGroup):
         treader = TReader(fname)
         prev_seqid = None
         for obj in treader.next_obj():
-            # if prev_seqid != obj.get_seqid():
-            #     prev_seqid = obj.get_seqid()
-            #     print(prev_seqid)
             self.add_object(obj)
 
         for obj in self.objects:

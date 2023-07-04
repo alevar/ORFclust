@@ -361,7 +361,7 @@ class Object:
             else:
                 raise AttributeError(f"'Object' object has no attribute '{name}'")
             
-    def _getattrs(self,attrs: str | List) -> Tuple:
+    def _getattrs(self,attrs) -> Tuple:
         """
         Able to return one or more attributes at once. Used when sorting or groupping by multiple keys.
         """
@@ -526,9 +526,30 @@ class Transcript (Object):
             exon = Exon(obj)
             self.exons.addi(self.start,self.end,exon)
 
-        # make sure the CDS (if added) fits within exons
         if len(self.cds)>0:
+            # make sure the CDS (if added) fits within exons
             assert len(self.exons[self.cds.begin()])>0 and len(self.exons[self.cds.end()-1])>0,"invalid CDS detected in transcript when finalizing: "+self.tid
+
+            self.assign_phase()
+
+    def assign_phase(self, start_phase: int=0) -> None:
+        """
+        Assign the phase to the CDS elements.
+
+        Args:
+            start_phase (int, optional): The phase to start with. Defaults to 0.
+        """
+
+        if self.strand == "-":
+            cdsacc = start_phase
+            for c in sorted(self.cds)[::-1]:
+                c[2].set_phase((3-cdsacc%3)%3)
+                cdsacc += (c[2].get_end()-1) - c[2].get_start()+1
+        else:
+            cdsacc = start_phase
+            for c in sorted(self.cds):
+                c[2].set_phase((3-cdsacc%3)%3)
+                cdsacc += (c[2].get_end()-1) - c[2].get_start()+1
 
     def to_exon(self) -> 'Exon':
         """
@@ -585,9 +606,20 @@ class Transcript (Object):
             None
 
         """
-        self.exons = IntervalTree.from_tuples(copy.deepcopy(exons))
-        for e in self.exons:
-            e[2].set_type(Types.Exon)
+        for e in exons:
+            exon_obj = Exon()
+            if len(e)==3 and type(e[2])==Exon: # has Exon object in the tuple
+                exon_obj = copy.deepcopy(e[2])
+            elif len(e)>=2:
+                exon_obj.set_tid(self.tid)
+                exon_obj.set_seqid(self.seqid)
+                exon_obj.set_strand(self.strand)
+                exon_obj.set_start(e[0])
+                exon_obj.set_end(e[1])
+            else:
+                raise Exception("invalid Exon tuple: "+str(e))
+            
+            self.exons.addi(e[0],e[1],exon_obj)
 
     def set_cds(self, cds: list[tuple[int, int]]) -> None:
         """
@@ -600,7 +632,23 @@ class Transcript (Object):
             None
 
         """
-        self.cds = IntervalTree.from_tuples(cds)
+        for c in cds:
+            cds_obj = CDS()
+            if len(c)==3 and type(c[2])==CDS: # has CDS object in the tuple
+                cds_obj = copy.deepcopy(c[2])
+            elif len(c)>=2:
+                cds_obj.set_tid(self.tid)
+                cds_obj.set_seqid(self.seqid)
+                cds_obj.set_strand(self.strand)
+                cds_obj.set_start(c[0])
+                cds_obj.set_end(c[1])
+                cds_obj.set_phase(0)
+            else:
+                raise Exception("invalid CDS tuple: "+str(c))
+            
+            self.cds.addi(c[0],c[1],cds_obj)
+
+            # TODO: reassign phase when finalizing transcript
 
     def set_tid(self, tid: str) -> None:
         """
@@ -946,6 +994,53 @@ class CDS(Exon):
         """
         super().__init__(obj)
         self.obj_type = Types.CDS
+        self.phase = 0
+    
+    def set_phase(self,phase):
+        self.phase = phase
+
+    def get_phase(self):
+        return self.phase
+    
+    def to_gtf(self):
+        """Convert the CDS to GTF format.
+
+        Returns:
+            str: The CDS object represented in GTF format without new line at the end.
+
+        """
+        res = self.seqid+"\t"+\
+                self.source+"\t"+\
+                Types.type2str(self.obj_type) +"\t"+\
+                str(self.start)+"\t"+\
+                str(self.end-1)+"\t"+\
+                "."+"\t"+\
+                self.strand+"\t"+\
+                str(self.phase)+"\t"+\
+                to_attribute_string(self.attrs,False,"exon")
+        return res
+    
+    def to_gff(self):
+        """Convert the CDS to GFF format.
+
+        Returns:
+            str: The CDS object represented in GFF format  without new line at the end.
+
+        """
+        res = self.seqid+"\t"+\
+                self.source+"\t"+\
+                Types.type2str(self.obj_type) +"\t"+\
+                str(self.start)+"\t"+\
+                str(self.end-1)+"\t"+\
+                "."+"\t"+\
+                self.strand+"\t"+\
+                str(self.phase)+"\t"+\
+                to_attribute_string(self.attrs,True,"exon")
+        return res
+    
+    __repr__ = to_gtf
+
+    __str__ = __repr__
 
 class GTFObjectFactory:
     """
@@ -974,7 +1069,6 @@ class GTFObjectFactory:
             return CDS(obj)
         else:
             return obj
-        
 
 
 # every GTF object has some shared properties

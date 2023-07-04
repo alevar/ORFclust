@@ -55,7 +55,7 @@ def orfclust(args):
 
             # accumulate expression data
             total_exp = sum([tx.get_expression(sum) for tx in grp.object_it()])
-            rep_tx.set_expression(total_exp)
+            rep_tx.set_expression([total_exp])
 
             out_gtf_fp.write(rep_tx.to_gtf()+"\n")
             out_grp_fp.write(rep_tx.get_tid()+"\t"+",".join([tx.get_tid() for tx in grp.object_it()])+"\n")

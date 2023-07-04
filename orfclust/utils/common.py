@@ -22,17 +22,17 @@ from enum import Enum, auto
 from typing import Tuple,List
 
 class Types (Enum):
-    Transcript = auto(),
-    MRNA = auto(),
-    UTR = auto(),
-    UTR5p = auto(),
-    UTR3p = auto(),
-    Bundle = auto(),
-    Gene = auto(),
-    Exon = auto(),
-    CDS = auto(),
-    Intron = auto(),
-    Other = auto()
+    Transcript = 1
+    MRNA = 2
+    UTR = 3
+    UTR5p = 4
+    UTR3p = 5
+    Bundle = 6
+    Gene = 7
+    Exon = 8
+    CDS = 9
+    Intron = 10
+    Other = 11
 
     @staticmethod
     def str2type(type_str: str):

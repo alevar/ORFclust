@@ -1,3 +1,0 @@
-treader - parse and form transcripts immediately, or yield parsed lines which can thenn be formed into transcripts independently (bytranscriptome)
-transcriptome - contain all transcripts from a gtf, can sort and yield groups, such as loci or yield transcripts individually
-transcript is a standardized form capable of conversion into any type
