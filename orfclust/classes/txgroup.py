@@ -334,7 +334,6 @@ class Transcriptome (TXGroup):
             fname (str): The file name to read the objects from.
         """
         treader = TReader(fname)
-        prev_seqid = None
         for obj in treader.next_obj():
             self.add_object(obj)
 
@@ -365,6 +364,13 @@ class Transcriptome (TXGroup):
                     num_samples = len(lcs)-1
                 assert num_samples == len(lcs)-1,"number of samples is inconsistend in the expression file. Each row is expected to have the same number of values"
                 
+                # check if the line is header line
+                has_tx_id_col = lcs[0]=="tx_id"
+                numeric_values = [x.replace(".","",1).isnumeric() for x in lcs[1:]]
+
+                if has_tx_id_col or not all(numeric_values):
+                    continue
+
                 cur_tid = lcs[0]
                 idx = self.tid_map.get(cur_tid,None)
 

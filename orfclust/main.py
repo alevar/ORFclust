@@ -8,12 +8,27 @@ import os
 from classes.txgroup import Transcriptome, Gene, Bundle
 from classes.transcript import Transcript
 
+# TODO: if txcounts/expression is not provided - can not report highest expression - report mode should be set to something else
+
 def orfclust(args):
 
     out_fname = args.output.rstrip(".gtf").rstrip(".GTF").rstrip(".gff").rstrip(".GFF")
     out_gtf_fp = open(out_fname+".gtf","w+") # clustered version of the annotation file
     out_exp_fp = open(out_fname+".txcounts","w+") # clustered version of the expression file
     out_grp_fp = open(out_fname+".groups","w+") # two columns: representative transcript_id, comma-separated list of all transcript_ids in the group
+
+
+    # load header line from the expression file and output to the new file
+    if args.exp is not None:
+        with open(args.exp,"r") as exp_fp:
+            # if the first line is a header - output it to the new file
+            # header is defined as a line that starts with "tx_id" or line where all values other than the first one are numeric
+            first_line = exp_fp.readline().strip()
+            has_tx_id_col = first_line.startswith("tx_id")
+            numeric_values = [x.replace(".","",1).isnumeric() for x in first_line.split("\t")[1:]]
+
+            if has_tx_id_col or not all(numeric_values):
+                out_exp_fp.write(first_line+"\n")
 
     transcriptome = Transcriptome()
     transcriptome.build_from_file(args.gtf)
