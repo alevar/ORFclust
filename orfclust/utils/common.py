@@ -13,7 +13,6 @@ import os
 import re
 import random
 import pyBigWig
-import upsetplot
 import subprocess
 import numpy as np
 import pandas as pd
@@ -413,66 +412,6 @@ def extract_from_comp(segs):  # separated "shared,left,right" into separate obje
 
     return left, shared, right
 
-
-# extract three-way comparisons
-def upset_data(segs):
-    res = {111: dict(),
-           100: dict(),
-           1: dict(),
-           10: dict(),
-           101: dict(),
-           110: dict(),
-           11: dict()}
-
-    for seqid in segs[0]:
-        for k, v in res.items():
-            v.setdefault(seqid, list())
-
-        s0 = segs[0][seqid]
-        s1 = segs[1][seqid]
-        s2 = segs[2][seqid]
-
-        s0s1 = compare(s0, s1)
-        s2s1 = compare(s2, s1)
-        s0s2 = compare(s0, s2)
-
-        s0_not_s1, s0_and_s1, s1_not_s0 = extract_from_comp(s0s1)
-        s2_not_s1, s2_and_s1, s1_not_s2 = extract_from_comp(s2s1)
-        s0_not_s2, s0_and_s2, s2_not_s0 = extract_from_comp(s0s2)
-
-        # shared between all three
-        tmp = compare(s0_and_s1, s2)
-        x, s0_and_s1_and_s2, y = extract_from_comp(tmp)
-        # in s0 only
-        tmp = compare(s0_not_s1, s2)
-        s0_not_s1_not_s2, x, y = extract_from_comp(tmp)
-        # in s2 only
-        tmp = compare(s2_not_s1, s0)
-        s2_not_s1_not_s0, x, y = extract_from_comp(tmp)
-        # in s1 only
-        tmp = compare(s1_not_s0, s2)
-        s1_not_s0_not_s2, x, y = extract_from_comp(tmp)
-        # s0 and s2
-        tmp = compare(s0_and_s2, s1)
-        s0_and_s2_not_s1, x, y = extract_from_comp(tmp)
-        # s0 and s1
-        tmp = compare(s0_and_s1, s2)
-        s0_and_s1_not_s2, x, y = extract_from_comp(tmp)
-        # s1 and s2
-        tmp = compare(s2_and_s1, s0)
-        s2_and_s1_not_s0, x, y = extract_from_comp(tmp)
-
-        res[111][seqid] = s0_and_s1_and_s2
-        res[100][seqid] = s0_not_s1_not_s2
-        res[1][seqid] = s2_not_s1_not_s0
-        res[10][seqid] = s1_not_s0_not_s2
-        res[101][seqid] = s0_and_s2_not_s1
-        res[110][seqid] = s0_and_s1_not_s2
-        res[11][seqid] = s2_and_s1_not_s0
-
-    return res
-
-
 # extract scores
 def get_scores(scores_fname, ud, num_random=None):
     res = dict()
@@ -498,52 +437,7 @@ def get_scores(scores_fname, ud, num_random=None):
                 res[k] = random.sample(v, num_random)
 
     return res, min_score, max_score
-
-
-# get position count matrix
-def pos_mat(ud, labels, scores=None):
-    res = upsetplot.from_memberships([[],
-                                      [labels[0]],
-                                      [labels[1]],
-                                      [labels[1], labels[0]],
-                                      [labels[2]],
-                                      [labels[2], labels[0]],
-                                      [labels[2], labels[1]],
-                                      [labels[2], labels[1], labels[0]], ], data=[0,
-                                                                                  sum([clen(v) for k, v in
-                                                                                       ud[100].items()]),
-                                                                                  sum([clen(v) for k, v in
-                                                                                       ud[10].items()]),
-                                                                                  sum([clen(v) for k, v in
-                                                                                       ud[110].items()]),
-                                                                                  sum([clen(v) for k, v in
-                                                                                       ud[1].items()]),
-                                                                                  sum([clen(v) for k, v in
-                                                                                       ud[101].items()]),
-                                                                                  sum([clen(v) for k, v in
-                                                                                       ud[11].items()]),
-                                                                                  sum([clen(v) for k, v in
-                                                                                       ud[111].items()])])
-
-    res_scores = [(sum([clen(v) for k, v in ud[100].items()]), []),
-                  (sum([clen(v) for k, v in ud[10].items()]), []),
-                  (sum([clen(v) for k, v in ud[110].items()]), []),
-                  (sum([clen(v) for k, v in ud[1].items()]), []),
-                  (sum([clen(v) for k, v in ud[101].items()]), []),
-                  (sum([clen(v) for k, v in ud[11].items()]), []),
-                  (sum([clen(v) for k, v in ud[111].items()]), [])]
-    if scores is not None:
-        res_scores = [(sum([clen(v) for k, v in ud[100].items()]), scores[100]),
-                      (sum([clen(v) for k, v in ud[10].items()]), scores[10]),
-                      (sum([clen(v) for k, v in ud[110].items()]), scores[110]),
-                      (sum([clen(v) for k, v in ud[1].items()]), scores[1]),
-                      (sum([clen(v) for k, v in ud[101].items()]), scores[101]),
-                      (sum([clen(v) for k, v in ud[11].items()]), scores[11]),
-                      (sum([clen(v) for k, v in ud[111].items()]), scores[111])]
-
-    return [res, res_scores]
-
-
+    
 # get_mean_score
 def mean_score(score_fname):
     means = []
