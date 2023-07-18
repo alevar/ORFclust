@@ -104,10 +104,17 @@ class TXGroup:
 
         prev_key = None
         group = TXGroup()
-
+        no_cds = []
         for obj in self.objects:
+            try:
+                if not obj.has_cds():
+                    no_cds.append(obj)
+                    continue
+            except:
+                pass
+
             key = obj._getattrs(by)
-            if prev_key is None or prev_key != key:
+            if key != prev_key:
                 if not group.is_empty():
                     yield prev_key, group
                 group = TXGroup()
@@ -115,6 +122,10 @@ class TXGroup:
             prev_key = key
         if not group.is_empty():
             yield prev_key, group
+        for obj2 in no_cds:
+            group = TXGroup()
+            group.add_object(obj2)
+            yield obj2._getattrs(by), group
 
     def sort(self,by) -> None:
         """
