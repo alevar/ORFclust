@@ -107,7 +107,7 @@ class TXGroup:
 
         for obj in self.objects:
             key = obj._getattrs(by)
-            if key != prev_key:
+            if prev_key is None or prev_key != key:
                 if not group.is_empty():
                     yield prev_key, group
                 group = TXGroup()

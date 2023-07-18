@@ -17,8 +17,22 @@ import subprocess
 import numpy as np
 import pandas as pd
 from enum import Enum, auto
+from intervaltree import Interval, IntervalTree
 
 from typing import Tuple,List
+
+def it_eq(it1,it2):
+    '''
+    Evaluates equality two interval trees. Only compares the intervals, and not objects stored within
+    '''
+    if len(it1) != len(it2):
+        return False
+    
+    for i1,i2 in zip(sorted(it1),sorted(it2)):
+        if i1[0] != i2[0] or i1[1] != i2[1]:
+            return False
+        
+    return True
 
 class Types (Enum):
     Transcript = 1

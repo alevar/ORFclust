@@ -976,6 +976,12 @@ class Exon(Object):
                 to_attribute_string(self.attrs,True,"exon")
         return res
     
+    def __eq__(self, other: Object) -> bool:
+        '''
+        Check if two objects are equal. Only consider coordinates and not attributes or tid
+        '''
+        return isinstance(other, Object) and self.seqid==other.seqid and self.start==other.start and self.end==other.end and self.strand==other.strand
+    
     __repr__ = to_gtf
 
     __str__ = __repr__
