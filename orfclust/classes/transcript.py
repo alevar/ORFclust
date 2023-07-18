@@ -1002,15 +1002,16 @@ class Exon(Object):
                 to_attribute_string(self.attrs,True,"exon")
         return res
     
+    __repr__ = to_gtf
+
+    __str__ = __repr__
+
     def __eq__(self, other: Object) -> bool:
         '''
         Check if two objects are equal. Only consider coordinates and not attributes or tid
         '''
         return isinstance(other, Object) and self.seqid==other.seqid and self.start==other.start and self.end==other.end and self.strand==other.strand
     
-    __repr__ = to_gtf
-
-    __str__ = __repr__
 
 class CDS(Exon):
 
@@ -1101,6 +1102,13 @@ class GTFObjectFactory:
             return CDS(obj)
         else:
             return obj
+        
+    def __eq__(self, other: Object) -> bool:
+        '''
+        Check if two objects are equal. Only consider coordinates and not attributes or tid
+        '''
+        return super().__eq__() and self.phase==other.phase
+    
 
 
 # every GTF object has some shared properties
