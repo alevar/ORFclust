@@ -598,6 +598,8 @@ class Transcript (Object):
     def set_exons(self, exons: list[tuple[int, int]]) -> None:
         """
         Set the exons of the Transcript.
+        Objects will be copied with their attributes including transcript and gene ID.
+        Up to the user to ensure attributes are handled correctly.
 
         Args:
             exons (list[tuple[int, int]]): A list of exon intervals represented as tuples.
@@ -616,6 +618,7 @@ class Transcript (Object):
                 exon_obj.set_strand(self.strand)
                 exon_obj.set_start(e[0])
                 exon_obj.set_end(e[1])
+                exon_obj.set_attributes(e[2].get_attributes())
             else:
                 raise Exception("invalid Exon tuple: "+str(e))
             
@@ -624,6 +627,8 @@ class Transcript (Object):
     def set_cds(self, cds: list[tuple[int, int]]) -> None:
         """
         Set the CDS regions of the Transcript.
+        Objects will be copied with their attributes including transcript and gene ID.
+        Up to the user to ensure attributes are handled correctly.
 
         Args:
             cds (list[tuple[int, int]]): A list of CDS intervals represented as tuples.
@@ -643,12 +648,33 @@ class Transcript (Object):
                 cds_obj.set_start(c[0])
                 cds_obj.set_end(c[1])
                 cds_obj.set_phase(0)
+                cds_obj.set_attributes(c[2].get_attributes())
             else:
                 raise Exception("invalid CDS tuple: "+str(c))
             
             self.cds.addi(c[0],c[1],cds_obj)
 
             # TODO: reassign phase when finalizing transcript
+
+    def clear_exons(self) -> None:
+        """
+        Clear the exons of the Transcript.
+
+        Returns:
+            None
+
+        """
+        self.exons = IntervalTree()
+    
+    def clear_cds(self) -> None:
+        """
+        Clear the CDS regions of the Transcript.
+
+        Returns:
+            None
+
+        """
+        self.cds = IntervalTree()
 
     def set_tid(self, tid: str) -> None:
         """

@@ -63,6 +63,7 @@ def orfclust(args):
                 rep_tx = copy.deepcopy(max(grp.object_it(),key=lambda tx: tx.elen()))
             elif args.rep == "ORF":
                 rep_tx = copy.deepcopy(next(grp.object_it())) # get first transcript as a model to modify
+                rep_tx.clear_exons()
                 rep_tx.set_exons(rep_tx.get_cds())
                 rep_tx.finalize()
             else:
