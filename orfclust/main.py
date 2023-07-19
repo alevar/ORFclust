@@ -89,9 +89,11 @@ def orfclust(args):
                     cumulative_expressions = tx.get_expression()
                 else:
                     cumulative_expressions = [x + y for x, y in zip(cumulative_expressions, tx.get_expression())]
-
+            
+            out_exp_list = []
             for exp in cumulative_expressions:
-                out_exp_fp.write(str(round(exp,2))+"\t")
+                out_exp_list.append(str(round(exp,4)))
+            out_exp_fp.write("\t".join(out_exp_list))
             out_exp_fp.write("\n")
 
     out_gtf_fp.close()
