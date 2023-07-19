@@ -82,17 +82,18 @@ def orfclust(args):
             # lastly, we need to figure out how to handle the expression data
             # we need to sum up expression values for each sample in the txcounts file separately
             # the output txcounts should have the same samples preserved as in the input txcounts file
-            out_exp_fp.write(rep_tx.get_tid()+"\t")
             cumulative_expressions = []
             for tx in grp.object_it():
                 if not cumulative_expressions:
                     cumulative_expressions = tx.get_expression()
                 else:
                     cumulative_expressions = [x + y for x, y in zip(cumulative_expressions, tx.get_expression())]
-
-            for exp in cumulative_expressions:
-                out_exp_fp.write(str(round(exp,2))+"\t")
-            out_exp_fp.write("\n")
+            
+            if len(cumulative_expressions) != 0:
+                out_exp_fp.write(rep_tx.get_tid()+"\t")
+                for exp in cumulative_expressions:
+                    out_exp_fp.write(str(round(exp,2))+"\t")
+                out_exp_fp.write("\n")
 
     out_gtf_fp.close()
     out_exp_fp.close()
