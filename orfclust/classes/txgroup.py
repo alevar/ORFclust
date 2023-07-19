@@ -135,6 +135,9 @@ class TXGroup:
         """
         cmp = lambda obj: obj._getattrs(by)
         self._sort(cmp)
+
+    def size(self) -> int:
+        return len(self.objects)
     
     def _sort(self,cmp) -> None:
         """
