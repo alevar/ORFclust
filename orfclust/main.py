@@ -91,8 +91,7 @@ def orfclust(args):
             
             if len(cumulative_expressions) != 0:
                 out_exp_fp.write(rep_tx.get_tid()+"\t")
-                for exp in cumulative_expressions:
-                    out_exp_fp.write(str(round(exp,2))+"\t")
+                out_exp_fp.write('\t'.join([str(round(exp, 2)) for exp in cumulative_expressions]))
                 out_exp_fp.write("\n")
 
     out_gtf_fp.close()
