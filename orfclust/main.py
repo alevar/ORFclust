@@ -48,6 +48,15 @@ def orfclust(args):
     else:
         raise Exception("Unknown representative transcript option: "+args.rep)
 
+    # iterate over all groups and create a new transcriptome using groupped representations of transcripts
+    # compute
+
+    # TODO:
+    #  1. have elen function for objects
+    #  2. can we generate readcount from TPM? Reverse compute and then compare to those reported by salmon
+    #  3. groups of trancripts should return effective length as the intersection of segments of other transcripts
+    #  4. 
+
     for gene in transcriptome.gene_it():
         groupper = ["cds"]
         if args.mode == "FUNC":
@@ -92,7 +101,7 @@ def orfclust(args):
             if len(cumulative_expressions) != 0:
                 out_exp_fp.write(rep_tx.get_tid()+"\t")
                 for exp in cumulative_expressions:
-                    out_exp_fp.write(str(round(exp,2))+"\t")
+                    out_exp_fp.write(str(round(exp,4))+"\t")
                 out_exp_fp.write("\n")
 
     out_gtf_fp.close()
